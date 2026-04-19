@@ -20,8 +20,14 @@ $where  = ['r.reservation_date = ?'];
 $params = [$filterDate];
 
 // Therapist: only see their own reservations
+// if ($role === 'therapist') {
+//     $where[]  = 'r.therapist_id = ?';
+//     $params[] = auth()['id'];
+// }
+
 if ($role === 'therapist') {
-    $where[]  = 'r.therapist_id = ?';
+    // Terapis bisa melihat reservasinya sendiri ATAU yang belum di-assign (menunggu)
+    $where[]  = '(r.therapist_id = ? OR r.therapist_id IS NULL)';
     $params[] = auth()['id'];
 }
 

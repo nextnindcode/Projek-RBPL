@@ -38,6 +38,14 @@ if (!$res) {
     redirect('monitoring/index.php');
 }
 
+// Assign otomatis jika terapis menekan "Proses" dan reservasi belum ada terapisnya
+if (currentRole() === 'therapist' && $res['therapist_id'] === null) {
+    $db->prepare('UPDATE reservations SET therapist_id = ? WHERE id = ?')
+       ->execute([auth()['id'], $id]);
+       
+    $res['therapist_id'] = auth()['id']; // Update state variable untuk bypass pengecekan di bawahnya
+}
+
 // Therapist can only update their own reservations
 if (currentRole() === 'therapist' && $res['therapist_id'] != auth()['id']) {
     // Allow if no therapist assigned yet

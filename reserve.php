@@ -57,10 +57,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $customerName  = trim(post('customer_name'));
     $phoneNumber   = trim(post('phone_number'));
     $serviceId     = (int)post('service_id');
-    $therapistId   = (int)post('therapist_id') ?: null;
+    // $therapistId   = (int)post('therapist_id') ?: null;
+    $therapistId = null;
     $resDate       = post('reservation_date');
     $resTime       = post('reservation_time');
-    $room          = post('room_number');
+    // $room          = post('room_number');
+    $room = null;
     $notes         = trim(post('notes'));
 
     if (!$customerName) $errors['customer_name'] = 'Nama wajib diisi.';
@@ -68,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$serviceId)    $errors['service_id']    = 'Pilih layanan.';
     if (!$resDate)      $errors['reservation_date'] = 'Tanggal wajib diisi.';
     if (!$resTime)      $errors['reservation_time'] = 'Waktu wajib diisi.';
-    if (!$room)         $errors['room_number']   = 'Pilih nomor ruangan.';
+    // if (!$room)         $errors['room_number']   = 'Pilih nomor ruangan.';
     if ($resDate && $resDate < date('Y-m-d')) $errors['reservation_date'] = 'Tidak dapat memilih tanggal yang sudah lewat.';
 
     if (!$errors) {
@@ -80,15 +82,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $endMin  = (int)$h * 60 + (int)$m + $duration;
         $endTime = sprintf('%02d:%02d', floor($endMin/60)%24, $endMin%60);
 
-        // Conflict checks
-        $roomChk = $db->prepare("SELECT id FROM reservations WHERE reservation_date=? AND room_number=? AND status!='Selesai' AND NOT(end_time<=? OR reservation_time>=?)");
-        $roomChk->execute([$resDate,$room,$resTime,$endTime]);
-        if ($roomChk->fetch()) $errors['room_number'] = 'Ruangan sudah terpakai pada waktu tersebut.';
+        // Cari ruangan kosong secara otomatis (1 sampai 8)
+        $availableRoom = null;
+        foreach (range(1, 8) as $n) {
+            $r = str_pad($n, 2, '0', STR_PAD_LEFT);
+            $roomChk = $db->prepare("SELECT id FROM reservations WHERE reservation_date=? AND room_number=? AND status!='Selesai' AND NOT(end_time<=? OR reservation_time>=?)");
+            $roomChk->execute([$resDate, $r, $resTime, $endTime]);
+            
+            // Jika tidak ada hasil fetch, berarti ruangan ini KOSONG di jam tersebut
+            if (!$roomChk->fetch()) {
+                $availableRoom = $r;
+                break; // Berhenti mencari jika sudah dapat 1 ruangan kosong
+            }
+        }
 
-        if ($therapistId) {
-            $thChk = $db->prepare("SELECT id FROM reservations WHERE reservation_date=? AND therapist_id=? AND status!='Selesai' AND NOT(end_time<=? OR reservation_time>=?)");
-            $thChk->execute([$resDate,$therapistId,$resTime,$endTime]);
-            if ($thChk->fetch()) $errors['therapist_id'] = 'Terapis sudah ada jadwal pada waktu tersebut.';
+        if (!$availableRoom) {
+            // Jika setelah dilooping 8 ruangan penuh semua, berikan error
+            $errors['reservation_time'] = 'Mohon maaf, semua ruangan telah penuh pada waktu tersebut. Silakan pilih waktu atau tanggal lain.';
+        } else {
+            // Jika ada yang kosong, assign ruangan tersebut
+            $room = $availableRoom;
         }
     }
 
@@ -180,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="mb-3">
+            <!-- <div class="mb-3">
                 <label class="form-label">Terapis (Opsional)</label>
                 <select name="therapist_id" id="therapistId" class="form-select" onchange="checkConflict()">
                     <option value="">-- Pilih Terapis --</option>
@@ -188,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <option value="<?= $t['id'] ?>" <?= post('therapist_id')==$t['id']?'selected':'' ?>><?= sanitize($t['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
-            </div>
+            </div> -->
             <div class="row">
                 <div class="mb-3">
                     <label class="form-label">Tanggal *</label>
@@ -204,7 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php if (isset($errors['reservation_time'])): ?><div class="invalid-feedback"><?= $errors['reservation_time'] ?></div><?php endif; ?>
                 </div>
             </div>
-            <div class="mb-3">
+            <!-- <div class="mb-3">
                 <label class="form-label">Nomor Ruangan *</label>
                 <div class="room-grid">
                     <?php foreach ($rooms as $r): ?>
@@ -216,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php endforeach; ?>
                 </div>
                 <?php if (isset($errors['room_number'])): ?><div class="invalid-feedback d-block"><?= $errors['room_number'] ?></div><?php endif; ?>
-            </div>
+            </div> -->
             <div class="mb-3">
                 <label class="form-label">Catatan Khusus</label>
                 <textarea name="notes" class="form-control" rows="2" placeholder="Alergi, preferensi, dll..."><?= sanitize(post('notes')) ?></textarea>
