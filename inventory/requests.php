@@ -15,7 +15,7 @@ $role = currentRole();
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'request') {
     verifyCsrf();
     $productId = (int)post('product_id');
-    $qty       = (float)post('requested_qty');
+    $qty       = (int)post('requested_qty');
     $notes     = trim(post('notes'));
 
     if ($productId && $qty > 0) {
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array(post('action'), ['approve'
     guardRole('purchasing','manager');
     $reqId    = (int)post('request_id');
     $action   = post('action');
-    $appQty   = (float)post('approved_qty');
+    $appQty   = (int)post('approved_qty');
     $appNotes = trim(post('approval_notes'));
     $status   = $action === 'approve' ? 'Disetujui' : 'Ditolak';
 
@@ -117,7 +117,7 @@ include __DIR__ . '/../views/layouts/header.php';
                             <th>Oleh</th>
                             <th>Tanggal</th>
                             <th>Status</th>
-                            <?php if (in_array($role,['purchasing','manager'])): ?><th>Aksi</th><?php endif; ?>
+                            <?php if ($role === 'purchasing'): ?><th>Aksi</th><?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -131,14 +131,14 @@ include __DIR__ . '/../views/layouts/header.php';
                             <td style="font-size:.83rem"><?= sanitize($r['requester_name'] ?? '-') ?></td>
                             <td style="font-size:.83rem"><?= date('d M Y', strtotime($r['requested_at'])) ?></td>
                             <td><?= statusBadge($r['status']) ?></td>
-                            <?php if (in_array($role,['purchasing','manager']) && $r['status'] === 'Pending'): ?>
+                            <?php if ($role === 'purchasing' && $r['status'] === 'Pending'): ?>
                             <td>
                                 <button onclick="showApprove(<?= $r['id'] ?>, '<?= sanitize($r['product_name']) ?>', <?= $r['requested_qty'] ?>)"
                                     class="btn-tea" style="font-size:.78rem;padding:.25rem .65rem">
                                     <i class="bi bi-check-lg"></i> Proses
                                 </button>
                             </td>
-                            <?php elseif (in_array($role,['purchasing','manager'])): ?>
+                            <?php elseif ($role === 'purchasing'): ?>
                             <td><span style="font-size:.78rem;color:var(--muted)">Selesai</span></td>
                             <?php endif; ?>
                         </tr>

@@ -56,15 +56,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'add') {
     redirect('therapist/index.php');
 }
 
-// List
-$filterDate = get('date', date('Y-m-d'));
-$schedules  = $db->prepare("SELECT ts.*, u.name as therapist_name
+// List — show ALL schedules by default, filter is optional
+$filterDate      = get('date', '');
+$filterTherapist = (int)get('therapist_id', 0);
+
+$where  = ['1=1'];
+$params = [];
+
+if ($filterDate !== '') {
+    $where[]  = 'ts.schedule_date = ?';
+    $params[] = $filterDate;
+}
+if ($filterTherapist > 0) {
+    $where[]  = 'ts.therapist_id = ?';
+    $params[] = $filterTherapist;
+}
+
+$whereStr  = implode(' AND ', $where);
+$schedStmt = $db->prepare("SELECT ts.*, u.name as therapist_name
     FROM therapist_schedules ts
     JOIN users u ON u.id = ts.therapist_id
-    WHERE ts.schedule_date = ?
-    ORDER BY ts.start_time ASC");
-$schedules->execute([$filterDate]);
-$schedules = $schedules->fetchAll();
+    WHERE $whereStr
+    ORDER BY ts.schedule_date ASC, ts.start_time ASC");
+$schedStmt->execute($params);
+$schedules = $schedStmt->fetchAll();
 
 $therapists = $db->query("SELECT * FROM users WHERE role = 'therapist' AND is_active = 1 ORDER BY name")->fetchAll();
 
@@ -117,11 +132,27 @@ include __DIR__ . '/../views/layouts/header.php';
         <div class="card">
             <div class="card-header">
                 <h5><i class="bi bi-people me-2"></i>Jadwal Terapis</h5>
+                <span style="font-size:.8rem;color:var(--muted)"><?= count($schedules) ?> jadwal</span>
             </div>
             <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border)">
-                <form method="GET" style="display:flex;gap:.5rem;align-items:center">
-                    <input type="date" name="date" class="form-control" style="width:auto" value="<?= sanitize($filterDate) ?>">
-                    <button type="submit" class="btn-tea" style="padding:.5rem .9rem"><i class="bi bi-search"></i></button>
+                <form method="GET" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+                    <div>
+                        <label class="form-label" style="margin-bottom:.2rem">Filter Terapis</label>
+                        <select name="therapist_id" class="form-select" style="width:auto">
+                            <option value="">Semua Terapis</option>
+                            <?php foreach ($therapists as $t): ?>
+                            <option value="<?= $t['id'] ?>" <?= $filterTherapist == $t['id'] ? 'selected' : '' ?>><?= sanitize($t['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" style="margin-bottom:.2rem">Filter Tanggal</label>
+                        <input type="date" name="date" class="form-control" style="width:auto" value="<?= sanitize($filterDate) ?>">
+                    </div>
+                    <div style="align-self:flex-end;display:flex;gap:.4rem">
+                        <button type="submit" class="btn-tea" style="padding:.5rem .9rem"><i class="bi bi-search"></i> Filter</button>
+                        <a href="<?= url('therapist/index.php') ?>" class="btn-outline-tea" style="padding:.5rem .9rem">Reset</a>
+                    </div>
                 </form>
             </div>
             <div class="table-wrap">
@@ -132,13 +163,14 @@ include __DIR__ . '/../views/layouts/header.php';
                             <th>Tanggal</th>
                             <th>Mulai</th>
                             <th>Selesai</th>
+                            <th>Catatan</th>
                             <th>Status</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (!$schedules): ?>
-                        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-calendar-x"></i><p>Belum ada jadwal untuk tanggal ini</p></div></td></tr>
+                        <tr><td colspan="7"><div class="empty-state"><i class="bi bi-calendar-x"></i><p>Belum ada jadwal<?= $filterDate || $filterTherapist ? ' untuk filter ini' : '' ?></p></div></td></tr>
                         <?php endif; ?>
                         <?php foreach ($schedules as $s): ?>
                         <tr>
@@ -146,6 +178,7 @@ include __DIR__ . '/../views/layouts/header.php';
                             <td><?= formatDate($s['schedule_date']) ?></td>
                             <td><?= formatTime($s['start_time']) ?></td>
                             <td><?= formatTime($s['end_time']) ?></td>
+                            <td style="font-size:.8rem;color:var(--muted)"><?= sanitize($s['notes'] ?: '-') ?></td>
                             <td><?= $s['is_available'] ? '<span class="badge bg-success">Tersedia</span>' : '<span class="badge bg-secondary">Tidak Tersedia</span>' ?></td>
                             <td>
                                 <form method="POST" style="display:inline">

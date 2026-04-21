@@ -39,13 +39,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $recorded = 0;
     foreach ($items as $item) {
         $productId = (int)($item['product_id'] ?? 0);
-        $qty       = (float)($item['quantity'] ?? 0);
+        $qty       = (int)($item['quantity'] ?? 0);
         if (!$productId || $qty <= 0) continue;
 
         // Check stock
         $stockStmt = $db->prepare('SELECT stock FROM products WHERE id = ?');
         $stockStmt->execute([$productId]);
-        $stock = (float)$stockStmt->fetchColumn();
+        $stock = (int)$stockStmt->fetchColumn();
 
         if ($qty > $stock) {
             flash('error',"Stok tidak mencukupi untuk produk ID $productId (stok: $stock).",'error');
